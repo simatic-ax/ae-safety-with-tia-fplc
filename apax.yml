@@ -1,0 +1,129 @@
+# General information
+name: "@simatic-ax/ae-safety-with-tia-fplc"
+version: 0.0.1
+author: "Siemens AG"
+type: app
+# Description for your application example or app
+description: <Basic Safety Logic Handling in Simatic AX with TCP IP connection with FPLC>
+
+repository:
+  type: git
+  url: https://github.siemens.cloud/simatic-ax/ae-safety-with-tia-fplc
+# Targets to be compiled with 'apax build'
+targets:
+  - "1500"
+  - llvm
+# Catalog:
+catalogs:
+  "@ax/simatic-ax": ^2510.0.0
+# Registry information, to other npm-registries where Apax packages are located
+registries:
+  '@simatic-ax': 'https://npm.pkg.github.com/'
+# Dependencies
+dependencies:
+  "@ax/system-timer": ^10.2.7
+  "@ax/simatic-communication": ^11.0.1
+devDependencies:
+  "@ax/sdk": ^2510.0.0
+
+# Project variables
+variables:
+  APAX_BUILD_ARGS:
+    - --debug # Enable debug information for value debugging
+  # Folder where to find the compiled HW artifacts
+  HW_BIN_FOLDER: ./hwbin
+
+  # Folder where to find the compiled SW artifacts
+  SW_BIN_FOLDER: "./bin/1500"
+
+  # Choose your target RT, here : any S7-1500 PLC
+  # IP address must match with the IP address of your target device
+  # The IP address in the .vscode/launch.json must be equal  
+  IP_ADDRESS: "192.168.0.1"
+
+  # The master password to protect the confidential configuration data on the PLC
+  # DISCLAIMER: Storing and publishing passwords in readable form is not a best practice.
+  # It has been added as variable to this document so that it can be used in the following scripts.
+  # You should remove it from this document after running the scripts before making your project available to others.
+  # Alternatively, you can completely dispense with the scripts contained in this document and enter all relevant commands directly in the terminal.
+  # Another alternative is to create the variables as environment variables in your local host system. You can then remove the definition from this document and still use the prepared scripts.
+  # Please use a password that is case sensitive (1 big and 1 small letter), a special character and a number.
+  MASTER_PW: "VeryGoodPassword123!"
+
+  # The locations of the certificate files
+  TLS_CONNECT_CERTFILE: "certificate/reference_x509.crt"
+  TLS_IMPORT_CERTFILE: "certificate/containerWithPublicAndPrivateKeys_x509.p12"
+
+  # The password (or passphrase) to access containerWithPublicAndPrivateKeys_x509.p12 used when importing the certificate
+  # DISCLAIMER: Storing and publishing passwords in readable form is not a best practice.
+  CERT_PASSPHRASE: "MyPasswordThatIInsertByCreationOfProject"
+
+  # The name of the PLC as specified in the PLC configuration
+  # The name should be specified before creating the PLC's security file, as the file are assigned using the PLC name.
+  PLC_NAME: "PLC_1"
+
+  # The user names as specified in the PLC configuration
+  USER_NAME: "User1"
+
+  # DISCLAIMER: Storing and publishing passwords in readable form is not recommended
+  USER_PASSWORD: "Siemens123!"
+
+# Apax scripts
+scripts:
+  ############### Inital runs for PLC / PLC Name changes ###########################
+  # The bash function provide the easy creation of certificates via open ssl and then moves the certificate to the certificate folder. 
+  # In order to call the script, the access level must be authorized at the beginning.
+  create_certificate:
+    - chmod +x certificate/createCertificateViaOpenSSL.sh
+    - certificate/createCertificateViaOpenSSL.sh $CERT_PASSPHRASE
+    - echo "Make sure that the CERT_PASSPHRASE variable retains the value that was last used to generate the certificate files when you import certificates later."
+  hwc_setup_ReadAccess_protection_password:
+    - apax hwc set-accessprotection-password --module-name $PLC_NAME --input hwc --level ReadAccess --password $USER_PASSWORD
+  hwc_setup_FullAccess_protection_password:
+    - apax hwc set-accessprotection-password --module-name $PLC_NAME --input hwc --level FullAccess --password Siemens!1
+  # Creates a file for the PLC's security configuration
+  hwc_setup_secure_communication: hwc setup-secure-communication --input hwc --module-name $PLC_NAME --master-password $MASTER_PW
+  # Imports the certificate for secure communication (TLS:Transport Layer Security) into this project so that it can be loaded to the PLC
+  hwc_import_certificate: hwc import-certificate --input hwc --module-name $PLC_NAME --certificate $TLS_IMPORT_CERTFILE --passphrase $CERT_PASSPHRASE --purpose TLS
+  # Adds a user for the PLC
+  hwc_add_user: hwc manage-users --input hwc --module-name $PLC_NAME set-password --username $USER_NAME --password $USER_PASSWORD
+  ##################################################################################
+  # Compiles the hardware description (input: sources) to generate specific data (output: binaries) and updates the IO and HwIdent mapping (SystemConstants)
+  hw_compile: hwc compile --input hwc --output $HW_BIN_FOLDER
+  # Loads the target-specific hardware data (binaries) onto the PLC
+  hw_load: hwld load --input $HW_BIN_FOLDER/$PLC_NAME --target $IP_ADDRESS --accept-security-disclaimer --certificate $TLS_CONNECT_CERTFILE --master-password $MASTER_PW
+  # Calls 'apax load' to download the builded program to the target. An 'apax build' might be required upfront
+  load: sld load --input $SW_BIN_FOLDER --target $IP_ADDRESS --restart --accept-security-disclaimer --log debug -C $TLS_CONNECT_CERTFILE
+  # Builds and downloads the application to the target PLC
+  dlplc:
+    - apax build
+    - apax load
+  # Compiles the hardware and software, then loads them onto the PLC
+  compile_and_load_all:
+    - apax hw_compile
+    - apax hw_load
+    - apax dlplc
+  monitor:
+    - apax mon --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --file ./variables.mon --continuously
+
+  start:
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 1
+    - sleep 0.4
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 0
+
+  stop:
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 1
+    - sleep 0.4
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 0
+
+  pulse_itemA:
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 1
+    - sleep 0.4
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 0
+
+  pulse_itemB:
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 1
+    - sleep 0.4
+    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 0
+
+

@@ -1,0 +1,59 @@
+Devices:
+- Name: Device_1
+  Modules:
+  - Name: 'PLC_1'
+    TypeIdentifier:
+      OrderNumber: '6ES7 516-3AP03-0AB0'
+      Version: 'V4.0'
+    # Disclaimer:
+    # By default, user management is used to access the PLC.  and an access concept was created.
+    # The following AccessLevel "FullAccess" is only used because this is a simple example
+    AccessProtection:
+      AccessLevel: 'FullAccess'
+    # The parameters listed below are currently commented out because the services are disabled by default.
+    # This is due to the Enabled parameter being set to false in the default configuration.
+    Interfaces:
+    - Name: 'PROFINET_interface_1'
+      Label: 'X1'
+      Addresses:
+        Configured:
+        - IPv4: '192.168.0.1/24'
+        - ProfinetDeviceName: 'plc_1.profinet interface_1'
+    - Name: 'PROFINET_interface_2'
+      Label: 'X2'
+      Addresses:
+        Configured:
+        - IPv4: '192.168.1.1/24'
+        - ProfinetDeviceName: 'plc_1.profinet interface_2'
+    Ports:
+    - Name: 'Port_1'
+      Label: 'X1 P1'
+    - Name: 'Port_2'
+      Label: 'X1 P2'
+    UserManagement:
+      Users:
+        - Name: 'User1'
+          AssignedRoles:
+          - 'Role1'
+      Roles:
+        - Name: 'Role1'
+          FunctionRights:
+          - 'ReadFiles'
+          - 'QueryDiagnostics'
+          - 'FlashLed'
+          - 'AccessProtectionFullAccess'
+  - Name: DI_1 
+    TypeIdentifier:
+      OrderNumber: 6ES7 521-1BH10-0AA0
+      Version: V1.1
+    IoConfiguration: 
+        # the configured value represents the "start address"
+        # The length of the address space depends on the type of the module being specified in the hardware declaration.
+        # After running apax hwc compile, the length can be seen in the IO Address Lock File.
+        InputAddress: '0.0'
+  - Name: DQ_1
+    TypeIdentifier:
+      OrderNumber: 6ES7 522-1BH10-0AA0
+      Version: V1.1
+    IoConfiguration: 
+        OutputAddress: '0.0'
