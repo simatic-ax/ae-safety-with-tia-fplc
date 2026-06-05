@@ -15,16 +15,16 @@ targets:
   - llvm
 # Catalog:
 catalogs:
-  "@ax/simatic-ax": ^2510.0.0
+  "@ax/simatic-ax": ^2510.13.1
 # Registry information, to other npm-registries where Apax packages are located
 registries:
   '@simatic-ax': 'https://npm.pkg.github.com/'
 # Dependencies
 dependencies:
-  "@ax/system-timer": ^10.2.7
-  "@ax/simatic-communication": ^11.0.1
+  "@ax/system-timer": ^10.4.16
+  "@ax/simatic-communication": ^11.0.2
 devDependencies:
-  "@ax/sdk": ^2510.0.0
+  "@ax/sdk": ^2510.13.1
 
 # Project variables
 variables:
@@ -125,5 +125,3 @@ scripts:
     - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 1
     - sleep 0.4
     - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 0
-
-
