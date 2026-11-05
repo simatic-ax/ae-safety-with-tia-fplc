@@ -1,4 +1,4 @@
-USING Siemens.Simatic.Communication.Ouc;
+USING Siemens.S7.Communication.OUC;
 
 TYPE connectionResult:
     STRUCT

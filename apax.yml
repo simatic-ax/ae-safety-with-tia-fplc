@@ -9,32 +9,26 @@ description: <Basic Safety Logic Handling in Simatic AX with TCP IP connection w
 repository:
   type: git
   url: https://github.siemens.cloud/simatic-ax/ae-safety-with-tia-fplc
-# Targets to be compiled with 'apax build'
-targets:
-  - "1500"
-  - llvm
 # Catalog:
 catalogs:
-  "@ax/simatic-ax": ^2510.13.1
+  "@ax-as/s7-catalog": 2610.0.1
 # Registry information, to other npm-registries where Apax packages are located
 registries:
   '@simatic-ax': 'https://npm.pkg.github.com/'
 # Dependencies
 dependencies:
-  "@ax/system-timer": ^10.4.16
-  "@ax/simatic-communication": ^11.0.2
+  "@ax-as/system-timer-lib": ^11.0.232
+  "@ax-as/s7-communication-lib": ^12.0.3
 devDependencies:
-  "@ax/sdk": ^2510.13.1
+  "@ax-as/s7-sdk": ^2610.0.1
 
 # Project variables
 variables:
-  APAX_BUILD_ARGS:
-    - --debug # Enable debug information for value debugging
   # Folder where to find the compiled HW artifacts
   HW_BIN_FOLDER: ./hwbin
 
   # Folder where to find the compiled SW artifacts
-  SW_BIN_FOLDER: "./bin/1500"
+  SW_BIN_FOLDER: "./out/my_s7_compilation/s7"
 
   # Choose your target RT, here : any S7-1500 PLC
   # IP address must match with the IP address of your target device
@@ -94,34 +88,37 @@ scripts:
   hw_load: hwld load --input $HW_BIN_FOLDER/$PLC_NAME --target $IP_ADDRESS --accept-security-disclaimer --certificate $TLS_CONNECT_CERTFILE --master-password $MASTER_PW
   # Calls 'apax load' to download the builded program to the target. An 'apax build' might be required upfront
   load: sld load --input $SW_BIN_FOLDER --target $IP_ADDRESS --restart --accept-security-disclaimer --log debug -C $TLS_CONNECT_CERTFILE
+  # Compiles and downloads the hardware configuration to the target PLC
+  hcl:
+    - apax hw_compile
+    - apax hw_load
   # Builds and downloads the application to the target PLC
-  dlplc:
-    - apax build
+  scl:
+    - apax make
     - apax load
   # Compiles the hardware and software, then loads them onto the PLC
   compile_and_load_all:
-    - apax hw_compile
-    - apax hw_load
-    - apax dlplc
+    - apax hcl
+    - apax scl
   monitor:
-    - apax mon --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --file ./variables.mon --continuously
+    - apax mon --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --input ./watchlist/variables.mon --continuous
 
   start:
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 1
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 1
     - sleep 0.4
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 0
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StartButton" --value 0
 
   stop:
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 1
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 1
     - sleep 0.4
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 0
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_StopButton" --value 0
 
   pulse_itemA:
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 1
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 1
     - sleep 0.4
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 0
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosA" --value 0
 
   pulse_itemB:
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 1
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 1
     - sleep 0.4
-    - apax mod --targetIP $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 0
+    - apax mod --target $IP_ADDRESS --certificate $TLS_CONNECT_CERTFILE --username $USER_NAME --password $USER_PASSWORD --symbol "IO_ItemAtPosB" --value 0

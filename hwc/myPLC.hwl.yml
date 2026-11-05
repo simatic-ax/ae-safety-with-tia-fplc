@@ -46,7 +46,10 @@ Devices:
     TypeIdentifier:
       OrderNumber: 6ES7 521-1BH10-0AA0
       Version: V1.1
-    IoConfiguration: 
+    Submodules:
+    - Name: DI_1
+      Slot: 1
+      IoConfiguration:
         # the configured value represents the "start address"
         # The length of the address space depends on the type of the module being specified in the hardware declaration.
         # After running apax hwc compile, the length can be seen in the IO Address Lock File.
@@ -55,5 +58,8 @@ Devices:
     TypeIdentifier:
       OrderNumber: 6ES7 522-1BH10-0AA0
       Version: V1.1
-    IoConfiguration: 
+    Submodules:
+    - Name: DQ_1
+      Slot: 1
+      IoConfiguration:
         OutputAddress: '0.0'

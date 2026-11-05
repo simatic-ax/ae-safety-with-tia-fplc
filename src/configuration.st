@@ -37,9 +37,9 @@ CONFIGURATION MyConfiguration
         IO_StatusLED_Red     AT %QX8.3 : BOOL;
         IO_StatusLED_Yellow  AT %QX8.4 : BOOL;
         IO_AlarmHorn         AT %QX8.5 : BOOL;
-        IO_SystemState       AT %QW2 : INT;
+        IO_SystemState       AT %QW2 : currentState;
         IO_ItemCounter       AT %QW4 : INT;
-        IO_FaultCode         AT %QW6 : INT;
+        IO_FaultCode         AT %QW6 : faultcode;
 
         // Conveyor instance
         Conveyor : ConveyorController;

@@ -13,10 +13,11 @@ NAMESPACE SimpleConveyor
             SystemEnabled       : BOOL := FALSE;
             ConveyorCommand     : BOOL := FALSE;
             ItemCounter         : INT := 0;
-            CounterDirection    : BOOL := TRUE;
-            CurrentState        : INT := 0; // 0=STOPPED, 1=STARTING, 2=RUNNING, 3=FAULT
+            CurrentState        : currentState;
+            LatchedFaultCode    : faultcode := faultcode#NO_FAULT;
             
-            // Edge detection
+            // Previous sensor states prevent a held input from counting every cycle.
+            ItemAtPosA_Old      : BOOL := FALSE;
             ItemAtPosB_Old      : BOOL := FALSE;
             StartButton_Old     : BOOL := FALSE;
             StopButton_Old      : BOOL := FALSE;
@@ -75,11 +76,16 @@ NAMESPACE SimpleConveyor
             ELSE
                 THIS.SystemEnabled := FALSE;
                 THIS.CurrentState := 3; // Fault state
+                IF NOT THIS.Inputs.SafetyOK THEN
+                    THIS.LatchedFaultCode := faultcode#GENERAL_SAFETY_FAULT;
+                ELSIF THIS.Inputs.MotorFault THEN
+                    THIS.LatchedFaultCode := faultcode#MOTOR_FAULT;
+                END_IF;
             END_IF;
 
             // Extended safety loss handling
             IF THIS.SafetyLossTimer.output THEN
-                THIS.Outputs.FaultCode := 3; // Extended safety loss fault
+                THIS.LatchedFaultCode := faultcode#EXTENDED_SAFETY_LOSS;
             END_IF;
         END_METHOD
         
@@ -118,6 +124,7 @@ NAMESPACE SimpleConveyor
                         THIS.StartDelay(signal := TRUE, duration := T#2S);
                         IF THIS.StartDelay.output THEN
                             THIS.CurrentState := 2; // Running
+                            THIS.LatchedFaultCode := faultcode#NO_FAULT;
                             THIS.StartDelay(signal := FALSE);
                         END_IF;
                     ELSE
@@ -139,27 +146,26 @@ NAMESPACE SimpleConveyor
         
         METHOD PRIVATE ProcessItems
             VAR
-                ItemEdge : BOOL;
+                ItemAtPosAEdge : BOOL;
+                ItemAtPosBEdge : BOOL;
             END_VAR
             
-            // Edge detection for item at Position B
-            ItemEdge := THIS.Inputs.ItemAtPosB AND NOT THIS.ItemAtPosB_Old;
+            // Count each sensor's rising edge once, even if its input stays high.
+            ItemAtPosAEdge := THIS.Inputs.ItemAtPosA AND NOT THIS.ItemAtPosA_Old;
+            ItemAtPosBEdge := THIS.Inputs.ItemAtPosB AND NOT THIS.ItemAtPosB_Old;
+
+            // Track inputs while stopped too, so a held sensor is not counted on start.
+            THIS.ItemAtPosA_Old := THIS.Inputs.ItemAtPosA;
             THIS.ItemAtPosB_Old := THIS.Inputs.ItemAtPosB;
 
-            // Counter logic - only when RUNNING and item detected
-            IF THIS.CurrentState = 2 AND ItemEdge THEN // Running and item detected
-                IF THIS.CounterDirection THEN
-                    // Counting UP
-                    THIS.ItemCounter := THIS.ItemCounter + 1;
-                    IF THIS.ItemCounter >= THIS.Inputs.MaxCounterValue THEN
-                        THIS.CounterDirection := FALSE; //Switch to count down
-                    END_IF;
-                ELSE
-                    THIS.ItemCounter := THIS.ItemCounter - 1;
-                    IF THIS.ItemCounter <= 0 THEN
-                        THIS.CounterDirection := TRUE; //Swithc to count up
-                    END_IF;
-                END_IF;
+            // Sensor events affect the item count only while the conveyor is running.
+            IF THIS.CurrentState = 2 THEN
+                THIS.ItemCounter := UpdateItemCounter(
+                    currentCount := THIS.ItemCounter,
+                    maxCounterValue := THIS.Inputs.MaxCounterValue,
+                    itemAtPosAEdge := ItemAtPosAEdge,
+                    itemAtPosBEdge := ItemAtPosBEdge
+                );
             END_IF;
         END_METHOD
         
@@ -169,31 +175,58 @@ NAMESPACE SimpleConveyor
             
             // Status LEDs with enhanced safety indication
             THIS.Outputs.StatusLED_Green := (THIS.CurrentState = 2);  // Running = Green
-            THIS.Outputs.StatusLED_Red := (THIS.CurrentState = 3) OR THIS.SafetyLossDetected;    // Fault = Red
+            THIS.Outputs.StatusLED_Red := (THIS.CurrentState = 0) OR (THIS.CurrentState = 3) OR THIS.SafetyLossDetected;
             THIS.Outputs.StatusLED_Yellow := (THIS.CurrentState = 1) OR (THIS.SafetyRestored AND THIS.CurrentState = 3); // Starting or Ready for Restart = Yellow
             
             // Alarm
-            THIS.Outputs.AlarmHorn := (THIS.CurrentState = 3) OR (THIS.SafetyLossDetected AND THIS.SafetyLossTimer.output);
+            THIS.Outputs.AlarmHorn := THIS.LatchedFaultCode <> faultcode#NO_FAULT;
             
             // Status info
             THIS.Outputs.SystemState := THIS.CurrentState;
             THIS.Outputs.ItemCounter := THIS.ItemCounter;
             
-            // Fault code assignment
-            IF THIS.CurrentState = 3 THEN
-                IF THIS.SafetyLossDetected AND THIS.SafetyLossTimer.output THEN
-                    THIS.Outputs.FaultCode := 3; // Extended safety loss
-                ELSIF NOT THIS.Inputs.SafetyOK THEN
-                    THIS.Outputs.FaultCode := 1; // Safety fault
-                ELSIF THIS.Inputs.MotorFault THEN
-                    THIS.Outputs.FaultCode := 2; // Motor fault
-                ELSE
-                    THIS.Outputs.FaultCode := 1; // General safety fault
-                END_IF;
-            ELSE
-                THIS.Outputs.FaultCode := 0; // No fault
-            END_IF;
+            THIS.Outputs.FaultCode := THIS.LatchedFaultCode;
         END_METHOD
         
     END_CLASS
+
+    FUNCTION UpdateItemCounter : INT
+        VAR_INPUT
+            currentCount : INT;
+            maxCounterValue : INT;
+            itemAtPosAEdge : BOOL;
+            itemAtPosBEdge : BOOL;
+        END_VAR
+        VAR
+            boundedCount : INT;
+            effectiveMaximum : INT;
+        END_VAR
+
+        // Treat an invalid negative maximum as an empty counter range.
+        effectiveMaximum := maxCounterValue;
+        IF effectiveMaximum < 0 THEN
+            effectiveMaximum := 0;
+        END_IF;
+
+        // Keep the existing count inside the configured range, including after a limit change.
+        boundedCount := currentCount;
+        IF boundedCount < 0 THEN
+            boundedCount := 0;
+        ELSIF boundedCount > effectiveMaximum THEN
+            boundedCount := effectiveMaximum;
+        END_IF;
+
+        // Opposite sensor events in the same cycle cancel each other.
+        IF itemAtPosAEdge AND NOT itemAtPosBEdge THEN
+            IF boundedCount < effectiveMaximum THEN
+                boundedCount := boundedCount + 1;
+            END_IF;
+        ELSIF itemAtPosBEdge AND NOT itemAtPosAEdge THEN
+            IF boundedCount > 0 THEN
+                boundedCount := boundedCount - 1;
+            END_IF;
+        END_IF;
+
+        UpdateItemCounter := boundedCount;
+    END_FUNCTION
 END_NAMESPACE

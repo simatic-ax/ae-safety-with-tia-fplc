@@ -1,5 +1,5 @@
 USING SimpleConveyor;
-USING Siemens.Simatic.Communication.OUC;
+USING Siemens.S7.Communication.OUC;
 
 PROGRAM ConveyorControl
     VAR_EXTERNAL
@@ -19,9 +19,9 @@ PROGRAM ConveyorControl
          IO_StatusLED_Red     : BOOL;
          IO_StatusLED_Yellow  : BOOL;
          IO_AlarmHorn         : BOOL;
-         IO_SystemState       : INT;
+         IO_SystemState       : currentState;
          IO_ItemCounter       : INT;
-         IO_FaultCode         : INT;
+         IO_FaultCode         : faultcode;
 
 
          //Classes instances reference of the global

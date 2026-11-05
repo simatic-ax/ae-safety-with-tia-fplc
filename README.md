@@ -1,7 +1,9 @@
 # Safety with TIA FPLC
 ## Description
 
-This is an application example for SIMATIC AX that demonstrates communication between a standard PLC (SIMATIC AX application) and a Safety PLC (programmed in TIA Portal) using TCP/IP. The standard PLC implements the conveyor state machine (STOPPED → STARTING → RUNNING → FAULT) and item counting. The Safety PLC is responsible for all safety-related inputs  and provides a single aggregated SafetyOK signal to the AX application. The Safety PLC always remains the authority for safety decisions; AX only requests motor action and reports state.
+This is an application example for SIMATIC AX that demonstrates communication between a standard PLC (SIMATIC AX application) and a Safety PLC (programmed in TIA Portal) using TCP/IP. The standard PLC implements the conveyor state machine (STOPPED → STARTING → RUNNING → FAULT) and item counting. The Safety PLC is responsible for all safety-related inputs  and provides a single aggregated SafetyOK signal to the AX application. The Safety PLC always remains the authority for safety decisions. AX only requests motor action and reports state.
+
+The simulation uses two PLCs: the AX PLC runs in a PLCSIM Advanced instance, and the safety F-PLC from the TIA Portal project runs in a separate PLCSIM instance. They communicate with each other over TCP/IP. By default, the AX PLC uses `192.168.0.1` and the TIA safety PLC uses `192.168.0.46`. TIA sends the `SafetyOK` signal to the AX PLC at TCP port `2001`.
 ## Used components
 
 - Simatic AX
@@ -24,22 +26,24 @@ This is an application example for SIMATIC AX that demonstrates communication be
    Run the following command in the CLI:
 
    ```sh
-   apax create @simatic-ax/ae-safety-wtih-tia-fplc --registry https://npm.pkg.github.com ae-safety-with-tia-fplc 
+   apax create @simatic-ax/ae-safety-with-tia-fplc --registry https://npm.pkg.github.com ae-safety-with-tia-fplc 
    ```
 
    Open **AxCode** with
 
    ```sh
-   cd ae-safety-wtih-tia-fplc
+   cd ae-safety-with-tia-fplc
    axcode .
    ```
 
 3. If it does not open automatically, open a terminal: (`CTRL+ ´`)
 
-4. Start a PLCSIM Advanced Instance (we are using a FW V4.0 PLC, so please use at least PLCSIm Advanced 7.0) with the same IP address that you will use in the `apax.yml`, the `.vscode/launch.json` and the `myPLC.hwl.yml` of the project. To change the IP, [follow the instructions](#prepare-configuration).
+4. Start a PLCSIM Advanced instance for the AX PLC. The project uses PLC firmware V4.0, so use PLCSIM Advanced 7.0 or later. Set its IP address to `192.168.0.1`, matching `IP_ADDRESS` in `apax.yml`, the IP in `.vscode/launch.json`, and interface X1 in `hwc/myPLC.hwl.yml`. To change the IP, [follow the instructions](#prepare-configuration).
+
+   ![PLCSIM Advanced instance for the AX PLC](docs/graphics/PLCSIMAdvancedInstance.png)
 
 :warning:
-You must have a PLCSIM Advanced instance running. Online access must be set to TCP/IP Single Adapter using the IP address and mask configured in the project
+You must have the AX PLCSIM Advanced instance running. Online access must be set to TCP/IP Single Adapter using the IP address and mask configured in the project.
 
 ## How to run this project
 
@@ -47,9 +51,9 @@ The process will be splitted in two different phases, one for setting up the Sim
 
 ### Simatic AX PLC
 
-We provide you the solution already prepared for being able to run the **Conveyor Logic** with just compilling and downloading the hardware and software. The hardware certificates and user configuration were already created from our side. The hardware certificate will bee generated using a third-party tool, in this case **OpenSSL**. The _create_certificate_ script will generate an X.509 certificate containing the private keys saved as PKCS#12 certificate. These files are located under the _certificate_ folder. This process is out of the scope of this project.
+We provide the solution ready to compile and download the **Conveyor Logic** hardware and software after completing the security setup described below. The *create_certificate* script uses **OpenSSL** to generate an X.509 certificate and a PKCS#12 container containing the certificate and private key. The generated files are stored in the *certificate* folder.
 
-This project shows as well how to add IO modules to the hardware configuration and how to do the mapping in the global variables. In this simulation scenario, the variables have been moved to different addresses to avoid the overwriting of the inputs and outputs on every PLC cycle.
+This project includes IO modules in the hardware configuration and their mapping to global variables. In this simulation scenario, the variables use different addresses to avoid being overwritten by cyclic IO updates.
 
 The process to run the project with the hardware configuration follows this steps:
 
@@ -57,25 +61,23 @@ The process to run the project with the hardware configuration follows this step
 
 2. Run the script _create_certificate_ that will generate the certificate in .crt format and the public and private key in PKCS#12 format.
 
-3. Run the script _ hwc_setup_secure_communication_  that will setup the secure communication and then will import the certificate to the hardware.
+3. Run the script _hwc_setup_secure_communication_ to create the PLC security configuration.
 
-4. Run the script _hwc_import_certificate_ that will add the certificate to the project json that will be loaded into the PLC 
-4. Run the script _set-password_ to enable the password for the user configurated "User1".
+4. Run the script _hwc_import_certificate_ to import the TLS certificate into the security configuration.
 
-5. Run the script _hcl_. Here the hardware configuration is compiled and downloaded to the plc instance.
+5. Run the script _hwc_add_user_ to set the password for "User1". The user's roles and permissions are configured under `UserManagement` in `hwc/myPLC.hwl.yml`.
 
-6. Run the script _scl_. The application is built and transferred to the instance.
+6. Run the script _hcl_. Here the hardware configuration is compiled and downloaded to the plc instance.
 
-In addition, there are commands to control the conveyor from AX side:
+7. Run the script _scl_. The application is built and transferred to the instance.
 
-- Start: Simulate input for start button
-- Stop: Simulate input for stop button
-- Pulse_itemA: Simulate input for item in the position A to increment the counter
-- Pulse_itemB: Simulate input for item in the position B to decrement the counter
+For instructions on operating the conveyor and simulating its inputs, see [Operating the simulation](docs/process.md).
 
 ### TIA Portal Configuration
 
 We provide you a ready to use project for the FPLC with the Safety Logic of this system. The project is located  under the `external/` folder as a compressed file `SafetyToAX_V20.zap20`. It contains a safety FPLC with a safety input card, the project has implemented an Emergency Button and its acknowledgement.
+
+Run the safety F-PLC from this TIA Portal project in a separate PLCSIM instance. Its default IP address is `192.168.0.46`. It communicates with the AX PLC at `192.168.0.1` over TCP/IP.
 
 For being able to run the project, follow this steps:
 
@@ -87,7 +89,7 @@ For being able to run the project, follow this steps:
 
    ![StartSimulation](docs/graphics/StartSimulation.jpg)
 
-3. Create the PLC Sim Instance of the device with the right IP address, license, and adapter:
+3. Create a PLCSIM instance for the safety F-PLC with the configured IP address `192.168.0.46` and the required network adapter:
 
    ![PlcSimInstance](docs/graphics/PlcSimInstance.jpg)
 
@@ -103,23 +105,22 @@ Once the project has been loaded to the device once, it is protected so you will
 
 Modify the IP addresses for your use case, whether if it is running in the same computer or different stations.
 
-Where to modify the IP Addresses in **SIMATIC AX**:
+Default simulation IP addresses:
 
-- Modify the IP Address and mask at line 20 in `hwconfiguration\myPLC.hwl.yml`:
+- AX PLC (PLCSIM Advanced): `192.168.0.1`
+- TIA safety F-PLC (PLCSIM): `192.168.0.46`
+
+Keep the two addresses different and in the same subnet so the PLCs can communicate over TCP/IP.
+
+Where to modify the IP address in **SIMATIC AX**:
+
+- Modify `IP_ADDRESS` in `apax.yml`, the IP in `.vscode/launch.json`, and interface X1's IP address and mask in `hwc/myPLC.hwl.yml`:
 
     ![AX_IP-1](docs/graphics/AX_IP-1.jpg)
 
-- Modify the IP Address at line 29 in `apax.yml`:
+Where to modify the IP address in **TIA Portal**:
 
-    ![AX_IP-2](docs/graphics/AX_IP-2.jpg)
-
-- Modify the IP Address at line 13 in `.vscode\launch.json`
-
-    ![AX_IP-3](docs/graphics/AX_IP-3.jpg)
-
-Where to modify the IP Addresses in **TIA Portal**:
-
-- Modify the IP Address and mask under Device Configuration > Properties > PROFINET Interface [X1] > Ethernet addresses:
+- Modify the IP address and mask under Device Configuration > Properties > PROFINET Interface [X1] > Ethernet addresses. This is the safety F-PLC address, `192.168.0.46` by default:
 
    ![TIAIpAddress](docs/graphics/TIAIpAddress.jpg)
 
