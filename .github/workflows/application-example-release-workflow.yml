@@ -28,13 +28,13 @@ jobs:
     needs: call-development
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/simatic-ax/ci-images/apax-ci-image:3.5.0
+      image: ghcr.io/simatic-ax/ci-images/apax-ci-image:4.4.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps: 
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # checks out the branch that has been selected during the release process
           ref: ${{ github.event.release.target_commitish }}
